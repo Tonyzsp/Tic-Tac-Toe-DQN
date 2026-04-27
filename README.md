@@ -1,29 +1,54 @@
 # Tic-Tac-Toe-DQN
 
-Deep Q-Learning implementation for Tic-Tac-Toe using PyTorch.  
-Includes self-play training, epsilon-greedy exploration, legal-action masking, and API inference with top-3 move probabilities.
+Deep Q-Learning Tic-Tac-Toe project with:
+- Python backend (FastAPI + PyTorch)
+- React frontend (Vite + Chart.js)
+- Real-time training metrics and tournament dashboard
 
-## Quick Start
+For a complete learning guide, see `teach.md`.
+
+## Architecture (Frontend + Backend)
+
+- Backend API default: `http://127.0.0.1:8000`
+- Frontend dev server default: `http://127.0.0.1:5173`
+- Frontend reads `VITE_API_BASE` and defaults to `http://127.0.0.1:8000`
+- You should run backend and frontend in separate terminals.
+
+## Prerequisites
+
+- Python 3.10+ recommended
+- Node.js 18+ recommended
+- npm
+
+## Backend Setup
+
+From project root:
 
 ```bash
-pip install -r requirements.txt
+python -m venv .venv
+# PowerShell
+.\.venv\Scripts\Activate.ps1
+pip install fastapi uvicorn torch websockets
 ```
 
-Run a short training loop:
+Start backend:
+
+```bash
+python -m uvicorn src.api.main:app --reload --port 8000
+```
+
+Health check:
+- Open `http://127.0.0.1:8000/health`
+
+Optional quick CLI training test:
 
 ```bash
 python scripts/train.py
 ```
 
-Start API server:
+## Frontend Setup
 
-```bash
-uvicorn src.api.main:app --reload
-```
-
-## Separate Frontend (Vite + React)
-
-Run frontend in another terminal:
+In a second terminal:
 
 ```bash
 cd frontend
@@ -31,15 +56,23 @@ npm install
 npm run dev
 ```
 
-Open frontend dashboard:
+Open:
+- `http://127.0.0.1:5173`
 
-- `http://127.0.0.1:5173/`
-
-Optional API override:
+If backend is not on default URL, run:
 
 ```bash
-VITE_API_BASE=http://127.0.0.1:8000 npm run dev
+$env:VITE_API_BASE="http://127.0.0.1:8000"
+npm run dev
 ```
+
+## Run Flow (Recommended)
+
+1. Start backend first.
+2. Start frontend second.
+3. Open frontend dashboard.
+4. Use Training tab to start training and save models.
+5. Use Play and Tournament tabs to evaluate behavior.
 
 ## API Endpoints
 
@@ -53,7 +86,8 @@ VITE_API_BASE=http://127.0.0.1:8000 npm run dev
 - `POST /train/stop`
 - `POST /infer` with body:
   - `state`: length-9 board values (`+1`, `-1`, `0`)
-  - `temperature`: softmax temperature
+  - `temperature`: policy temperature (`0` means pure argmax)
+  - `search_depth`: look-ahead depth (minimax-style evaluation)
   - `policy`: `model` or `random`
   - `model_id`: optional saved model id (for model policy)
   - `tau`: legacy alias (still supported)
@@ -76,12 +110,6 @@ Illegal moves are blocked by mask logic before action selection:
 - occupied board positions are assigned `-inf` for argmax/softmax
 - this is applied in both training and inference paths
 
-## Windows Torch DLL Note
-
-If you hit `WinError 1114` while importing torch, it is usually an environment dependency issue (CUDA/VC runtime/conda DLL conflict).  
-Try a clean virtual environment and reinstall CPU-only torch first:
-
-```bash
-pip uninstall -y torch
-pip install --index-url https://download.pytorch.org/whl/cpu torch
-```
+AI Brain Visualizer note:
+- The panel shows top-3 probabilities from the network policy.
+- The final chosen move can differ when `search_depth > 1`, because look-ahead search may override the network's top probability choice.
