@@ -321,6 +321,12 @@ function App() {
   }
   const runTournament = async () => {
     if (tournamentRunning) return
+    const uniqueIncluded = Array.from(new Set(tournamentIncludedModels))
+    if (uniqueIncluded.length < 2) {
+      setUiMessage('Tournament needs at least 2 selected models.')
+      showToast('Please select at least 2 models in Include Models.')
+      return
+    }
     setTournamentResult(null)
     setLeaderboard([])
     setMatrixLabels([])
@@ -330,7 +336,7 @@ function App() {
     const ws = new WebSocket(`${API_BASE.replace('http://', 'ws://').replace('https://', 'wss://')}/ws/tournament/all`)
     tournamentWsRef.current = ws
     ws.onopen = () => {
-      ws.send(JSON.stringify({ games: tournamentGames, temperature: tournamentTemperature, search_depth: tournamentSearchDepth, include_model_ids: tournamentIncludedModels }))
+      ws.send(JSON.stringify({ games: tournamentGames, temperature: tournamentTemperature, search_depth: tournamentSearchDepth, include_model_ids: uniqueIncluded }))
     }
     ws.onmessage = (evt) => {
       const d = JSON.parse(evt.data)
@@ -536,7 +542,7 @@ function App() {
               <label title="Include only selected models in this tournament run.">Include Models</label>
               <div className="includeModelList">
                 <label key="inc-random" className="includeItem">
-                  <span>random</span>
+                  <span title="random">random</span>
                   <input
                     type="checkbox"
                     checked={tournamentIncludedModels.includes('random')}
@@ -549,7 +555,7 @@ function App() {
                   const checked = tournamentIncludedModels.includes(m.id)
                   return (
                     <label key={`inc-${m.id}`} className="includeItem">
-                      <span>{m.id}</span>
+                      <span title={m.id}>{m.id}</span>
                       <input
                         type="checkbox"
                         checked={checked}
@@ -561,8 +567,9 @@ function App() {
                   )
                 })}
               </div>
+              <p className="muted">Selected: {Array.from(new Set(tournamentIncludedModels)).length} (need at least 2)</p>
             </div>
-            <div className="actions"><button onClick={runTournament} disabled={tournamentRunning}>{tournamentRunning ? 'Running...' : 'Run Full Tournament'}</button><button onClick={stopTournament} disabled={!tournamentRunning}>Stop</button></div>
+            <div className="actions"><button onClick={runTournament} disabled={tournamentRunning || Array.from(new Set(tournamentIncludedModels)).length < 2}>{tournamentRunning ? 'Running...' : 'Run Full Tournament'}</button><button onClick={stopTournament} disabled={!tournamentRunning}>Stop</button></div>
             {tournamentResult && (
               <p className="muted">
                 Tournament complete: {tournamentResult.games} games | Agents: {matrixLabels.length}
