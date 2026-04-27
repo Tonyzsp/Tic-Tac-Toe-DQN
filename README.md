@@ -5,7 +5,7 @@ Deep Q-Learning Tic-Tac-Toe project with:
 - React frontend (Vite + Chart.js)
 - Real-time training metrics and tournament dashboard
 
-For a complete learning guide, see `teach.md`.
+For more tech info, see `tech.md`.
 
 ## Architecture (Frontend + Backend)
 
@@ -24,11 +24,20 @@ For a complete learning guide, see `teach.md`.
 
 From project root:
 
+Windows (PowerShell):
+
 ```bash
 python -m venv .venv
-# PowerShell
 .\.venv\Scripts\Activate.ps1
-pip install fastapi uvicorn torch websockets
+pip install -r requirements.txt
+```
+
+macOS / Linux:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
 Start backend:
@@ -74,42 +83,35 @@ npm run dev
 4. Use Training tab to start training and save models.
 5. Use Play and Tournament tabs to evaluate behavior.
 
-## API Endpoints
-
-- `GET /health`
-- `GET /config`
-- `GET /models/options`
-- `GET /models/list`
-- `POST /models/load` with body: `{"model_id": "model_YYYYMMDD_HHMMSS"}`
-- `GET /training/status`
-- `POST /train/start` with body: `{"episodes": 100}`
-- `POST /train/stop`
-- `POST /infer` with body:
-  - `state`: length-9 board values (`+1`, `-1`, `0`)
-  - `temperature`: policy temperature (`0` means pure argmax)
-  - `search_depth`: look-ahead depth (minimax-style evaluation)
-  - `policy`: `model` or `random`
-  - `model_id`: optional saved model id (for model policy)
-  - `tau`: legacy alias (still supported)
-- `POST /tournament/run` with body:
-  - `games`, `x_policy`, `o_policy`
-  - optional `x_model_id`, `o_model_id`
-- `WS /ws/metrics` for real-time episode metrics
-
 ## Project Structure
 
-- `src/engine/tictactoe.py`: game rules, reward, illegal action handling
-- `src/model/dqn.py`: MLP DQN model, action masking, softmax policy
-- `src/rl/buffer.py`: replay buffer
-- `src/rl/trainer.py`: self-play training loop with target network
-- `src/api/main.py`: FastAPI service layer
-
-## Important Behavior
-
-Illegal moves are blocked by mask logic before action selection:
-- occupied board positions are assigned `-inf` for argmax/softmax
-- this is applied in both training and inference paths
-
-AI Brain Visualizer note:
-- The panel shows top-3 probabilities from the network policy.
-- The final chosen move can differ when `search_depth > 1`, because look-ahead search may override the network's top probability choice.
+```text
+Tic-Tac-Toe-DQN/
+├── frontend/
+│   ├── src/
+│   │   ├── App.jsx                  # main dashboard UI and interactions
+│   │   ├── App.css                  # dashboard styles
+│   │   ├── main.jsx                 # React entry
+│   │   └── index.css                # global styles
+│   ├── package.json
+│   └── vite.config.js
+├── scripts/
+│   └── train.py                     # quick CLI training script
+├── src/
+│   ├── api/
+│   │   └── main.py                  # FastAPI endpoints and WebSocket streams
+│   ├── engine/
+│   │   └── tictactoe.py             # game rules, terminal checks, rewards
+│   ├── model/
+│   │   └── dqn.py                   # DQN MLP, action masking utilities
+│   └── rl/
+│       ├── buffer.py                # replay buffer
+│       └── trainer.py               # self-play training loop + target sync
+├── static/
+│   └── index.html
+├── models/                          # local saved checkpoints (not committed)
+├── requirements.txt
+├── tech.md
+├── README.md
+└── .gitignore
+```

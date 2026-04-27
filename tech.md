@@ -1,8 +1,8 @@
-# Tic-Tac-Toe DQN Teaching Guide
+# Tic-Tac-Toe DQN Technical Guide
 
 This document explains how this project works, why each component exists, and how to reason about the key parameters.
 
-## 0) Algorithm and Loss (At a Glance)
+## 0) Algorithm and Loss
 
 - Main algorithm: **Deep Q-Network (DQN)** for discrete action control.
 - Training strategy: self-play + replay buffer + target network sync.
@@ -17,7 +17,7 @@ Loss function:
   - Terminal: `y = r`
 - Optimized quantity: `MSE(Q_online(s, a), y)`
 
-## 1) What This Project Builds
+## 1) System Overview
 
 You have a full local system with:
 - A Tic-Tac-Toe game engine
@@ -58,7 +58,7 @@ You have a full local system with:
 Before selecting actions, occupied cells are masked as `-inf`.  
 This is applied in training and inference so the model does not choose invalid moves.
 
-## 4) Parameters You Actually Feel in UI
+## 4) Runtime Parameters
 
 ### Temperature
 - Controls softness of policy probabilities.
@@ -73,7 +73,7 @@ This is applied in training and inference so the model does not choose invalid m
 - AI Brain panel shows network top-3 probabilities.
 - Final action may differ when depth search is enabled (`search_depth > 1`), because look-ahead can override the policy top-1.
 
-## 5) Training / Play / Tournament
+## 5) Modes and Runtime Behavior
 
 ### Training
 - Generates data online by self-play.
@@ -106,7 +106,29 @@ npm run dev
 - Compare in tournament
 - Inspect AI Brain behavior with and without search depth
 
-## 7) Important Parameters (Quick Reference)
+## 7) API Endpoints
+
+- `GET /health`
+- `GET /config`
+- `GET /models/options`
+- `GET /models/list`
+- `POST /models/load` with body: `{"model_id": "model_YYYYMMDD_HHMMSS"}`
+- `GET /training/status`
+- `POST /train/start` with body: `{"episodes": 100}`
+- `POST /train/stop`
+- `POST /infer` with body:
+  - `state`: length-9 board values (`+1`, `-1`, `0`)
+  - `temperature`: policy temperature (`0` means pure argmax)
+  - `search_depth`: look-ahead depth (minimax-style evaluation)
+  - `policy`: `model` or `random`
+  - `model_id`: optional saved model id (for model policy)
+  - `tau`: legacy alias (still supported)
+- `POST /tournament/run` with body:
+  - `games`, `x_policy`, `o_policy`
+  - optional `x_model_id`, `o_model_id`
+- `WS /ws/metrics` for real-time episode metrics
+
+## 8) Important Parameters (Quick Reference)
 
 Training:
 - `episodes`: number of training games in one run.
