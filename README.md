@@ -5,7 +5,7 @@ Deep Q-Learning Tic-Tac-Toe project with:
 - React frontend (Vite + Chart.js)
 - Real-time training metrics and tournament dashboard
 
-For more tech info, see `tech.md`.
+For more tech info, see [`tech.md`](./tech.md).
 
 ## Architecture (Frontend + Backend)
 
