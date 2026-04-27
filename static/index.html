@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tic-Tac-Toe DQN Dashboard</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 0; background: #111827; color: #e5e7eb; }
+      .wrap { max-width: 1100px; margin: 0 auto; padding: 16px; }
+      .grid { display: grid; gap: 16px; grid-template-columns: 1fr 1fr; }
+      .card { background: #1f2937; border-radius: 8px; padding: 12px; }
+      .board { display: grid; grid-template-columns: repeat(3, 80px); gap: 8px; }
+      .cell { width: 80px; height: 80px; font-size: 28px; border: none; border-radius: 8px; background: #374151; color: white; cursor: pointer; }
+      .cell:disabled { opacity: 0.7; cursor: not-allowed; }
+      input { background: #111827; color: #e5e7eb; border: 1px solid #4b5563; border-radius: 6px; padding: 6px 8px; width: 90px; }
+      button { background: #2563eb; color: white; border: none; border-radius: 6px; padding: 8px 12px; cursor: pointer; margin-right: 8px; }
+      .muted { color: #9ca3af; font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="text/babel">
+      const { useEffect, useMemo, useRef, useState } = React;
+
+      function App() {
+        const [board, setBoard] = useState(Array(9).fill(0));
+        const [episodes, setEpisodes] = useState(200);
+        const [temperature, setTemperature] = useState(1.0);
+        const [searchDepth, setSearchDepth] = useState(1);
+        const [brain, setBrain] = useState([]);
+        const [status, setStatus] = useState({ running: false, episodes_done: 0, episodes_total: 0 });
+        const [metrics, setMetrics] = useState([]);
+        const [uiMessage, setUiMessage] = useState("Idle");
+        const [wsConnected, setWsConnected] = useState(false);
+        const [lastMetric, setLastMetric] = useState(null);
+        const chartRef = useRef(null);
+        const chartObj = useRef(null);
+
+        useEffect(() => {
+          fetch("/training/status").then(r => r.json()).then(setStatus).catch(() => {});
+          const ws = new WebSocket(`ws://${location.host}/ws/metrics`);
+          ws.onopen = () => {
+            setWsConnected(true);
+            setUiMessage("Connected to metrics stream.");
+          };
+          ws.onclose = () => {
+            setWsConnected(false);
+            setUiMessage("Metrics stream disconnected.");
+          };
+          ws.onmessage = (evt) => {
+            const data = JSON.parse(evt.data);
+            if (data.type === "metrics") {
+              setMetrics(prev => [...prev.slice(-99), data]);
+              setLastMetric(data);
+            }
+            if (data.type === "training_status") {
+              setStatus(data);
+              if (data.running) {
+                setUiMessage(`Training running: ${data.episodes_done}/${data.episodes_total}`);
+              } else {
+                setUiMessage("Training stopped.");
+              }
+            }
+          };
+          return () => ws.close();
+        }, []);
+
+        useEffect(() => {
+          if (!chartRef.current) return;
+          const labels = metrics.map(m => m.episode);
+          const loss = metrics.map(m => m.loss);
+          if (!chartObj.current) {
+            chartObj.current = new Chart(chartRef.current, {
+              type: "line",
+              data: {
+                labels,
+                datasets: [
+                  { label: "Training Loss", data: loss, borderColor: "#60a5fa", tension: 0.2 },
+                  { label: "Validation Loss (placeholder)", data: loss, borderColor: "#34d399", tension: 0.2 }
+                ],
+              },
+              options: { responsive: true, plugins: { legend: { labels: { color: "#e5e7eb" } } }, scales: { x: { ticks: { color: "#9ca3af" } }, y: { ticks: { color: "#9ca3af" } } } }
+            });
+          } else {
+            chartObj.current.data.labels = labels;
+            chartObj.current.data.datasets[0].data = loss;
+            chartObj.current.data.datasets[1].data = loss;
+            chartObj.current.update();
+          }
+        }, [metrics]);
+
+        const symbols = useMemo(() => board.map(v => (v === 1 ? "X" : v === -1 ? "O" : "")), [board]);
+
+        const callInfer = async (nextBoard) => {
+          const r = await fetch("/infer", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ state: nextBoard, temperature })
+          });
+          const data = await r.json();
+          setBrain(data.top3_moves || []);
+          return data;
+        };
+
+        const playHuman = async (idx) => {
+          if (board[idx] !== 0) return;
+          const b1 = [...board];
+          b1[idx] = -1;
+          setBoard(b1);
+          const data = await callInfer(b1);
+          const ai = data.top3_moves?.[0]?.action;
+          if (ai !== undefined && b1[ai] === 0) {
+            const b2 = [...b1];
+            b2[ai] = 1;
+            setBoard(b2);
+            await callInfer(b2);
+          }
+        };
+
+        const resetBoard = () => {
+          setBoard(Array(9).fill(0));
+          setBrain([]);
+        };
+
+        const startTraining = async () => {
+          setUiMessage("Starting training...");
+          const res = await fetch("/train/start", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ episodes })
+          });
+          const data = await res.json();
+          if (data.ok) {
+            setUiMessage("Training started.");
+          } else {
+            setUiMessage(data.message || "Training start failed.");
+          }
+        };
+
+        const stopTraining = async () => {
+          setUiMessage("Stopping training...");
+          const res = await fetch("/train/stop", { method: "POST" });
+          const data = await res.json();
+          setUiMessage(data.message || "Stop requested.");
+        };
+
+        return (
+          <div className="wrap">
+            <h2>Tic-Tac-Toe DQN Dashboard</h2>
+            <div className="grid">
+              <div className="card">
+                <h3>Configuration Panel</h3>
+                <p className="muted">Search depth is exposed for optional look-ahead mode.</p>
+                <div>
+                  <label>Episodes </label>
+                  <input type="number" value={episodes} onChange={e => setEpisodes(parseInt(e.target.value || "1", 10))} />
+                  <label style={{marginLeft: 12}}>Temperature </label>
+                  <input type="number" step="0.1" value={temperature} onChange={e => setTemperature(parseFloat(e.target.value || "1"))} />
+                  <label style={{marginLeft: 12}}>Search Depth </label>
+                  <input type="number" min="1" value={searchDepth} onChange={e => setSearchDepth(parseInt(e.target.value || "1", 10))} />
+                </div>
+                <div style={{marginTop: 12}}>
+                  <button onClick={startTraining} disabled={status.running}>Start Training</button>
+                  <button onClick={stopTraining} disabled={!status.running}>Stop</button>
+                </div>
+                <p className="muted">Running: {String(status.running)} | Episode: {status.episodes_done}/{status.episodes_total}</p>
+                <p className="muted">WS: {wsConnected ? "connected" : "disconnected"} | Status: {uiMessage}</p>
+              </div>
+              <div className="card">
+                <h3>Live Metrics</h3>
+                <canvas ref={chartRef} height="120"></canvas>
+                <p className="muted">
+                  Last metric: {lastMetric ? `ep ${lastMetric.episode}, loss ${Number(lastMetric.loss).toFixed(4)}, eps ${Number(lastMetric.epsilon).toFixed(3)}` : "none"}
+                </p>
+              </div>
+              <div className="card">
+                <h3>Interactive Game Board</h3>
+                <div className="board">
+                  {symbols.map((s, i) => (
+                    <button key={i} className="cell" onClick={() => playHuman(i)} disabled={board[i] !== 0}>{s}</button>
+                  ))}
+                </div>
+                <div style={{marginTop: 12}}>
+                  <button onClick={resetBoard}>Reset Board</button>
+                </div>
+              </div>
+              <div className="card">
+                <h3>AI Brain Visualizer</h3>
+                <p className="muted">Top 3 legal moves (masked policy)</p>
+                {brain.length === 0 && <div className="muted">No inference yet.</div>}
+                {brain.map((m, i) => (
+                  <div key={i}>
+                    #{i + 1} action <b>{m.action}</b> | prob {(m.probability * 100).toFixed(2)}% | q {m.q_value.toFixed(4)}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    </script>
+  </body>
+  </html>

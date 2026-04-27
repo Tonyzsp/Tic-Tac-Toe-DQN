@@ -1,0 +1,18 @@
+# Normalize text files to LF by default
+* text=auto eol=lf
+
+# Keep Windows scripts as CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Common binary assets
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.pt binary
+*.pth binary
